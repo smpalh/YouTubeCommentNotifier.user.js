@@ -53,9 +53,10 @@ class Message {
    * @param {string}  iconUrl   投稿者のアイコン
    * @param {?string} badgeType 投稿者のバッジ
    * @param {string}  body      メッセージの本体
+   * @param {string}  source    メッセージの流れている放送を表す文字列（放送名など）
    */
-  constructor(author, iconUrl, badgeType, body) {
-    Object.assign(this, { author, iconUrl, badgeType, body, });
+  constructor(author, iconUrl, badgeType, body, source) {
+    Object.assign(this, { author, iconUrl, badgeType, body, source, });
   }
 
   /**
@@ -98,6 +99,7 @@ class NotificatonMessage {
       message.author,
       message.iconUrl,
       message.body,
+      message.source,
     );
   }
 
@@ -105,20 +107,22 @@ class NotificatonMessage {
    * @param {string} title   通知のタイトル
    * @param {string} iconUrl 通知のアイコン
    * @param {string} body    通知の本文
+   * @param {string} body    通知を行った配信
    */
-  constructor(title, iconUrl, body) {
-    Object.assign(this, { title, iconUrl, body });
+  constructor(title, iconUrl, body, source) {
+    Object.assign(this, { title, iconUrl, body, source });
   }
 
   /**
    * Notification APIを用いて、通知する
    */
-  async notify() {
+  notify() {
     // TODO  直接依存しない形にする
-    return new window.Notification(this.title || '', {
-      icon: this.iconUrl,
-      body: this.body,
-    });
+    return new window.Notification(
+      `${this.title || ''} (@${this.source})`, {
+        icon: this.iconUrl,
+        body: this.body,
+      });
   }
 }
 
@@ -128,10 +132,11 @@ class NotificatonMessage {
 class NotificationService {
   /**
    * @param {object}        notifySound        通知音を鳴らしてくれるような仕組みを持つオブジェクト
+   * @param {function}      selectWindow       ウィンドウを選択する函数
    * @param {array<RegExp>} authorNamePatterns 通知したいメッセージの著者の名前にマッチするパターンの配列
    */
-  constructor(notifySound, authorNamePatterns) {
-    Object.assign(this, { notifySound, authorNamePatterns });
+  constructor(notifySound, selectWindow, authorNamePatterns) {
+    Object.assign(this, { notifySound, selectWindow, authorNamePatterns });
   }
 
   /**
@@ -141,9 +146,13 @@ class NotificationService {
    */
   notify(message) {
     if (message.isModerator() || message.matchNameSome(this.authorNamePatterns)) {
-      NotificatonMessage
+      const notification = NotificatonMessage
         .fromMessage(message)
         .notify();
+
+      notification.addEventListener('click', () => {
+        this.selectWindow();
+      });
 
       this.notifySound.play();
     }
@@ -169,12 +178,7 @@ class NotificationService {
   async requestPermission() {
     const result = await Notification.requestPermission();
 
-    if (result === 'granted') {
-      return true;
-    }
-
-    window.alert('Notification APIで通知の許可がありません。通知を受け取るには、通知を許可してください。');
-    return false;
+    return result === 'granted';
   }
 }
 
@@ -189,15 +193,17 @@ async function main() {
     /^(Uka's room|ウェザーロイド Airi（ポン子）|文野環【 にじさんじ所属の野良猫 】 文野環【 にじさんじ所属の野良猫 】|Zombi-Ko Channel|Yuhi Riri Official|もちひよこ|ケリン|あっくん大魔王|Roboco Ch\. - ロボ子|Kanae Channel|伏見ガク【にじさんじ所属】|おめがシスターズ \[Ω Sisters\]|さはな【VTuber】|Akabane Channel|バーチャルYouTuber万楽えね|MeguRoom|Gilzaren III Season1|ニーツちゃんねる|電脳少女シロGames|滓残|バーチャルゴリラ|DeepWebUnderground|Hibiki Ao|最果ての魔王ディープブリザード|みゅ みゅ|岩本町芸能社YouTube|春日部つくし|北上双葉|霊電カスカ|夜桜たま|ぱかチューブっ!|日雇礼子のドヤ街暮らしチャンネル|海月ねうmituki neu|Tsunohane Akagi Vtube|もこめめ\*channel|馬越健太郎チャンネル|カルロ ピノ|金剛いろは|小林幸子のさっちゃんねる|ちえり花京院|Kanata Hikari \/ LYTO【バーチャルYoutuber】|Hoonie friends|織田信姫|ミディ \/ 作曲バーチャルyoutuber|さょちゃんのVR図書室|虚拟DD|木曽あずき|バーチャル園児-めいちゃんねる|猫乃木もち|いるはーと|六道冥の地獄ちゃんねる|ぜったい天使くるみちゃん|異世界転生系魔王ヘルネス|ねむちゃんねる【バーチャル美少女YouTuber】|八重沢なとり|シロウケン Shiroken世紀末系バーチャルyoutuber|\/ ODDAIオッドアイ|Kuzuha Channel|ユキミお姉ちゃんねる|魔法少女ちあちあちゃんねる|牛巻 りこ|Channelパゲ美のバーチャルオカマ|珠根うたChannel|モスコミュール放送局|ico通夜の黄泉巡りch|poemcore tokyo|DOLL GAL millna|クゥChannel|あさひちゃん寝る【バーチャルYouTuber】|神楽すず|ヤマト イオリ|たかじんちゃんねる【バーチャルyoutuber】|ナイセンチャンネル naisen channel|天神 子兎音 Tenjin Kotone|スパイト-spite-【公式】|メイカちゃんねる|〜旅するバーチャルyoutuber〜動く城のフィオ|食虫植物TV -Carnivorous Plants videos-|イヌージョンCHANNEL|Arcadia L\.E\. Projectバリトンエルフ|かまってちゃんねる|あいえるちゃんねる\/株式会社インフィニットループ|リクビッツ \/ バーチャルYouTuber|\/食虫植物系VTuberネアちゃんねる|シテイルチャンネル|Reratan|デラとハドウ Channel|Channelれらたん|世界クルミ\/バーチャルYouTuber|白二郎\/VRアライグマ|Mel Channel 夜空メルチャンネル|ファイ博士φ電脳サイエンティスト|真空管ドールズ公式|2\.5次元バーチャルキャスター「獣音ロウ&式大元」チャンネル|ぼっちぼろまる|淫獣帝国|Kite Channel|すくろーるちゃんねる!!! ／ 巣黒るい)$/,
     /^(Kimino Yumeka Official|新川良|天野声太郎|Sophiaちゃんねる|人工知能AI ユニ|白鳥天羽【バーチャル百合お嬢様】|RAY WAKANA|ありしあちゃんねる|MIALチャンネル|クーテトラチャンネル|スズキセシル|バーチャルおじいちゃん \/ G3Games|ドットチャンネル\.\/DotChannel\.|星菜日向夏のゼロ時間目|魔王の息子わんわん|そらのももか|コハクのおうち|バーチャルYouTuber蟹|くのいち子バーチャルユーチューバー|姫宮縷愛|魔界四天王ださお|バーチャル美少女 ハラムちゃんねる)$/
   ];
-  const notificationService = new NotificationService(notifySound, regexps);
+
+  const selectWindow = () => window.focus();
+  const notificationService = new NotificationService(notifySound, selectWindow, regexps);
 
   if (notificationService.notSupported()) {
-    window.console.error('Notification がサポートされていません');
+    window.alert('ブラウザが通知機能にされていません');
     return;
   }
 
   if (! await notificationService.requestPermission()) {
-    window.console.error('Notificatonの権限がありません');
+    window.alert('通知の許可がありません。通知を受け取るには、通知を許可してください。');
     return;
   }
 
@@ -215,6 +221,8 @@ async function main() {
   if (! chatItemList)
     return;
 
+  const title = document.querySelector('#container > h1').textContent;
+
   const toMessage = chatItem => {
     const nameElem  = chatItem.querySelector('#author-name');
     const iconElem  = chatItem.querySelector('yt-img-shadow > img#img');
@@ -226,7 +234,7 @@ async function main() {
       const body      = bodyElem.textContent;
       const badgeType = nameElem.getAttribute('type');
 
-      return new Message(name, iconUrl, badgeType, body);
+      return new Message(name, iconUrl, badgeType, body, title);
     }
   };
     
